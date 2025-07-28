@@ -29,4 +29,4 @@ Key Features
 
 
 
-  This Python code is a reference implementation of the Secure JSON-RPC Message (SJRM) Protocol v1.1 intended to illustrate the core concepts and workflow. It is not production-ready and may require further enhancements for security, performance, and scalability in real-world deployments. Users are encouraged to review, test, and improve the code according to their specific requirements and threat models.
+  This Python code is a reference implementation of the Secure JSON-RPC Message (SJRM) Protocol v1.0 intended to illustrate the core concepts and workflow. It is not production-ready and may require further enhancements for security, performance, and scalability in real-world deployments. Users are encouraged to review, test, and improve the code according to their specific requirements and threat models.
