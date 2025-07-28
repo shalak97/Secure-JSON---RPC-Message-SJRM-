@@ -1,0 +1,7 @@
+try:
+    tampered = wrapped_single.copy()
+    tampered["jsonrpc_payload"]["params"] = {"malicious": True}  # Modify payload
+    sjrm.unwrap_and_verify(tampered)
+    tamper_result = "❌ Tampered payload was NOT detected!"
+except AuthTagMismatchError:
+    tamper_result = "✅ Tampered payload correctly rejected due to HMAC mismatch."
