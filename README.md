@@ -1,5 +1,5 @@
 # Secure-JSON-RPC-Message
-SJRC can add per-message security features to JSON-RPC communications for Model Context Protocol.
+SJRM can add per-message security features to JSON-RPC communications for Model Context Protocol.
 
 SJRM enhances it by adding:
   Message integrity & authentication using HMAC (a secure cryptographic tag per message)
