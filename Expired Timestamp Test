@@ -1,0 +1,21 @@
+try:
+    expired = wrapped_single.copy()
+    expired["sjrm_header"]["timestamp"] = int(time.time() * 1000) - (sjrm.replay_window * 2000)  # Set too old
+    
+    # Re-compute auth tag since we changed the timestamp
+    header = expired["sjrm_header"]
+    payload = expired["jsonrpc_payload"]
+    jwt_key = sjrm._derive_key_from_jwt(header["jwt"])
+    header["auth_tag"] = sjrm._compute_auth_tag(
+        header["version"],
+        header["timestamp"],
+        header["nonce"],
+        header["sender_id"],
+        payload,
+        jwt_key
+    )
+
+    sjrm.unwrap_and_verify(expired)
+    expired_result = "❌ Expired timestamp was NOT detected!"
+except TimestampError:
+    expired_result = "✅ Expired timestamp correctly rejected."
