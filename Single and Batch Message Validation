@@ -1,0 +1,118 @@
+
+import base64
+import hmac
+import hashlib
+import json
+import time
+import os
+from collections import deque
+from typing import Union
+
+# Define custom exceptions
+class SJRMError(Exception): pass
+class ReplayAttackError(SJRMError): pass
+class AuthTagMismatchError(SJRMError): pass
+class TimestampError(SJRMError): pass
+
+# SJRM Protocol Handler (v1.1)
+class SJRMProtocolV1_1:
+    def __init__(self, server_secret: bytes, replay_window_seconds: int = 300):
+        self.server_secret = server_secret
+        self.replay_window = replay_window_seconds
+        self.nonce_cache = deque()
+        self.nonce_set = set()
+
+    @staticmethod
+    def _canonicalize_json(obj: Union[dict, list]) -> str:
+        return json.dumps(obj, separators=(',', ':'), sort_keys=True)
+
+    def _derive_key_from_jwt(self, jwt: str) -> bytes:
+        # Dummy JWT parsing: in practice, verify signature & extract claims
+        header, payload, _ = jwt.split('.')
+        decoded_payload = json.loads(base64.urlsafe_b64decode(payload + '=='))
+        context_string = decoded_payload['sub'] + str(decoded_payload['iat'])
+        return hmac.new(self.server_secret, context_string.encode(), hashlib.sha256).digest()
+
+    def _compute_auth_tag(self, version, timestamp, nonce, sender_id, payload, jwt_key) -> str:
+        canonical_payload = self._canonicalize_json(payload)
+        message = (version + str(timestamp) + nonce + sender_id + canonical_payload).encode()
+        hmac_digest = hmac.new(jwt_key, message, hashlib.sha256).digest()
+        return base64.b64encode(hmac_digest).decode()
+
+    def _validate_timestamp_and_nonce(self, timestamp, nonce):
+        now_ms = int(time.time() * 1000)
+        window_ms = self.replay_window * 1000
+        if not (now_ms - window_ms <= timestamp <= now_ms + window_ms):
+            raise TimestampError(f"Timestamp {timestamp} out of range")
+
+        # Clear expired nonces
+        while self.nonce_cache and self.nonce_cache[0][0] < now_ms - window_ms:
+            old_timestamp, old_nonce = self.nonce_cache.popleft()
+            self.nonce_set.discard(old_nonce)
+
+        if nonce in self.nonce_set:
+            raise ReplayAttackError("Replay detected")
+
+        self.nonce_cache.append((timestamp, nonce))
+        self.nonce_set.add(nonce)
+
+    def wrap_message(self, payload: Union[dict, list], sender_id: str, jwt: str, optional: bool = False) -> dict:
+        version = "1.1"
+        timestamp = int(time.time() * 1000)
+        nonce = base64.b64encode(os.urandom(16)).decode()
+        jwt_key = self._derive_key_from_jwt(jwt)
+        auth_tag = self._compute_auth_tag(version, timestamp, nonce, sender_id, payload, jwt_key)
+
+        return {
+            "sjrm_header": {
+                "version": version,
+                "timestamp": timestamp,
+                "nonce": nonce,
+                "auth_tag": auth_tag,
+                "sender_id": sender_id,
+                "optional": optional,
+                "jwt": jwt
+            },
+            "jsonrpc_payload": payload
+        }
+
+    def unwrap_and_verify(self, sjrm_message: dict) -> Union[dict, list]:
+        header = sjrm_message["sjrm_header"]
+        payload = sjrm_message["jsonrpc_payload"]
+        jwt_key = self._derive_key_from_jwt(header["jwt"])
+        expected_tag = self._compute_auth_tag(
+            header["version"],
+            header["timestamp"],
+            header["nonce"],
+            header["sender_id"],
+            payload,
+            jwt_key
+        )
+        if not hmac.compare_digest(header["auth_tag"], expected_tag):
+            raise AuthTagMismatchError("Invalid HMAC")
+        self._validate_timestamp_and_nonce(header["timestamp"], header["nonce"])
+        return payload
+
+# Minimal test harness
+server_secret = b"test_server_secret_123456"
+sjrm = SJRMProtocolV1_1(server_secret)
+
+# Dummy JWT with base64-encoded {"sub":"agent-123","iat":1720000000}
+dummy_jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZ2VudC0xMjMiLCJpYXQiOjE3MjAwMDAwMDB9.signature"
+
+# Define test messages
+single_msg = {"jsonrpc": "2.0", "method": "getStatus", "params": {}, "id": 1}
+batch_msg = [
+    {"jsonrpc": "2.0", "method": "getA", "params": {}, "id": 2},
+    {"jsonrpc": "2.0", "method": "getB", "params": {}, "id": 3}
+]
+
+# Wrap and verify single message
+wrapped_single = sjrm.wrap_message(single_msg, "agent-123", dummy_jwt)
+unwrapped_single = sjrm.unwrap_and_verify(wrapped_single)
+
+# Wrap and verify batch message
+wrapped_batch = sjrm.wrap_message(batch_msg, "agent-123", dummy_jwt)
+unwrapped_batch = sjrm.unwrap_and_verify(wrapped_batch)
+
+(unwrapped_single, unwrapped_batch)
