@@ -11,7 +11,12 @@ SJRM enhances it by adding:
   
   Version negotiation so different systems can agree on which SJRM version to use
 
+  
+
 Key Features
+
+
+
   Works seamlessly with both single and batch JSON-RPC requests
   
   Lightweight enough for high-performance microservices
