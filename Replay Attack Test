@@ -1,0 +1,15 @@
+# regenerate wrapped_single to get a fresh timestamp
+wrapped_single = sjrm.wrap_message(single_msg, "agent-123", dummy_jwt)
+
+try:
+    # unwrap the same message twice
+    sjrm.unwrap_and_verify(wrapped_single)
+    try:
+        sjrm.unwrap_and_verify(wrapped_single)
+        replay_result = "❌ Replay attack was NOT detected!"
+    except ReplayAttackError:
+        replay_result = "✅ Replay attack correctly rejected."
+except Exception as e:
+    replay_result = f"❌ Test failed with unexpected error: {e}"
+
+replay_result
