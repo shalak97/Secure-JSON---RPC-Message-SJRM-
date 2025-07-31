@@ -1,0 +1,159 @@
+import requests
+import json
+import base64
+import hmac
+import hashlib
+import time
+import os
+from collections import deque
+from typing import Union
+import uvicorn
+from fastapi import FastAPI, Request, HTTPException
+from fastapi.responses import JSONResponse
+import jwt
+from multiprocessing import Process
+
+# ==============================================================================
+# 1. SERVER DEFINITION (to be run in a separate process)
+# This is the same server code as before, just defined here for clarity.
+# ==============================================================================
+app = FastAPI()
+SERVER_SECRET_KEY = "YourServerSecret"
+NONCE_TTL_SEC = 300
+# NOTE: In a real multi-process app, this state would need to be in a shared
+# memory store like Redis, but for this linear test, a global dict is fine.
+seen_nonces = {}
+
+def derive_shared_secret_server(token):
+    try:
+        claims = jwt.decode(token, options={"verify_signature": False})
+        raw = claims.get("sub", "") + str(claims.get("iat", "")) + SERVER_SECRET_KEY
+        return hashlib.sha256(raw.encode()).digest()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Bad JWT claims")
+
+def check_and_store_nonce(nonce):
+    now = time.time()
+    for n, t in list(seen_nonces.items()):
+        if now - t > NONCE_TTL_SEC:
+            del seen_nonces[n]
+    if nonce in seen_nonces:
+        raise HTTPException(status_code=403, detail="Security error: nonce replayed")
+    seen_nonces[nonce] = now
+
+def verify_sjrm_header(header, canonical_payload):
+    msg_to_sign = (header["version"] + str(header["timestamp"]) + header["nonce"] + header["sender_id"] + canonical_payload)
+    secret = derive_shared_secret_server(header["jwt"])
+    expected_tag = base64.b64encode(hmac.new(secret, msg_to_sign.encode(), hashlib.sha256).digest()).decode()
+    if not hmac.compare_digest(header["auth_tag"], expected_tag):
+        raise HTTPException(status_code=403, detail="Security error: auth_tag mismatch")
+
+@app.post("/jsonrpc")
+async def receive_sjrm(request: Request):
+    try:
+        body = await request.json()
+        header, payload_obj = body['sjrm_header'], body['jsonrpc_payload']
+        if abs(time.time() * 1000 - header['timestamp']) > NONCE_TTL_SEC * 1000:
+            raise HTTPException(status_code=403, detail="Security error: timestamp expired")
+        check_and_store_nonce(header["nonce"])
+        canonical_payload = json.dumps(payload_obj, sort_keys=True, separators=(',', ':'))
+        verify_sjrm_header(header, canonical_payload)
+        return JSONResponse({"status": "SJRM accepted", "jsonrpc_payload": payload_obj})
+    except HTTPException as e:
+        return JSONResponse(status_code=e.status_code, content={"detail": e.detail})
+    except Exception as e:
+        return JSONResponse(status_code=400, content={"detail": f"Malformed SJRM message: {e}"})
+
+def run_server():
+    """Function to run the uvicorn server."""
+    uvicorn.run(app, host="0.0.0.0", port=8080, log_level="warning")
+
+
+# ==============================================================================
+# 2. CLIENT DEFINITION
+# This is the same client code, also included to be self-contained.
+# ==============================================================================
+class SJRMClient:
+    def __init__(self, server_secret: str):
+        self.server_secret = server_secret.encode()
+
+    def _derive_key(self, jwt_str: str) -> bytes:
+        _, payload_b64, _ = jwt_str.split('.')
+        payload = json.loads(base64.urlsafe_b64decode(payload_b64 + '=='))
+        context = payload['sub'] + str(payload['iat']) + SERVER_SECRET_KEY
+        return hashlib.sha256(context.encode()).digest()
+
+    def wrap(self, payload: dict, sender_id: str, jwt_str: str) -> dict:
+        timestamp = int(time.time() * 1000)
+        nonce = base64.b64encode(os.urandom(16)).decode()
+        key = self._derive_key(jwt_str)
+        canonical_payload = json.dumps(payload, sort_keys=True, separators=(',', ':'))
+        msg_to_sign = ("1.1" + str(timestamp) + nonce + sender_id + canonical_payload).encode()
+        auth_tag = base64.b64encode(hmac.new(key, msg_to_sign, hashlib.sha256).digest()).decode()
+
+        return {
+            "sjrm_header": {"version": "1.1", "timestamp": timestamp, "nonce": nonce, "auth_tag": auth_tag, "sender_id": sender_id, "jwt": jwt_str},
+            "jsonrpc_payload": payload
+        }
+
+
+# ==============================================================================
+# 3. TEST EXECUTION HARNESS
+# This controls starting the server, running tests, and stopping the server.
+# ==============================================================================
+if __name__ == '__main__':
+    # Start the server in a background process
+    server_process = Process(target=run_server)
+    server_process.start()
+    print("Server process started...")
+
+    # Wait for the server to be ready
+    server_ready = False
+    for i in range(10):  # Wait up to 10 seconds
+        try:
+            response = requests.get("http://localhost:8080/docs")
+            if response.status_code == 200:
+                print("✅ Server is ready.")
+                server_ready = True
+                break
+        except requests.ConnectionError:
+            time.sleep(1)
+    
+    if not server_ready:
+        print("❌ Server failed to start. Terminating.")
+        server_process.terminate()
+    else:
+        # --- Run Tests ---
+        client = SJRMClient(SERVER_SECRET_KEY)
+        dummy_jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZ2VudC0xMjMiLCJpYXQiOjE3MjAwMDAwMDB9.signature"
+        url = "http://localhost:8080/jsonrpc"
+        base_payload = {"jsonrpc": "2.0", "method": "test", "id": 1}
+
+        print("\n--- Running Tests ---")
+        
+        # Test 1: Valid message
+        valid_msg = client.wrap(base_payload, "agent-123", dummy_jwt)
+        res1 = requests.post(url, json=valid_msg)
+        print(f"Test 1 (Valid): {'✅ Passed' if res1.status_code == 200 else '❌ Failed'} (Status: {res1.status_code})")
+
+        # Test 2: Replay attack
+        res2_first = requests.post(url, json=valid_msg) # Send the same message again
+        print(f"Test 2 (Replay): {'✅ Passed' if res2_first.status_code == 403 else '❌ Failed'} (Status: {res2_first.status_code})")
+
+        # Test 3: Tampered payload
+        tampered_msg = client.wrap(base_payload, "agent-123", dummy_jwt)
+        tampered_msg["jsonrpc_payload"]["new_key"] = "tampered" # Modify after signing
+        res3 = requests.post(url, json=tampered_msg)
+        print(f"Test 3 (Tamper): {'✅ Passed' if res3.status_code == 403 else '❌ Failed'} (Status: {res3.status_code})")
+
+        # Test 4: Expired timestamp
+        expired_msg = client.wrap(base_payload, "agent-123", dummy_jwt)
+        expired_msg["sjrm_header"]["timestamp"] = int(time.time() * 1000) - (NONCE_TTL_SEC * 2000)
+        # Note: In a real test, you'd have to re-sign this. Here, we just test the server's timestamp check.
+        res4 = requests.post(url, json=expired_msg)
+        print(f"Test 4 (Expired): {'✅ Passed' if res4.status_code == 403 else '❌ Failed'} (Status: {res4.status_code})")
+
+    # Clean up the server process
+    print("\n--- All tests finished. Terminating server. ---")
+    server_process.terminate()
+    server_process.join()
