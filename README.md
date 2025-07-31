@@ -1,4 +1,4 @@
-# Secure-JSON-RPC-Message
+# Secure-JSON-RPC-Message wrapper
 SJRM can add per-message security features to JSON-RPC communications for Model Context Protocol.
 
 SJRM enhances it by adding:
