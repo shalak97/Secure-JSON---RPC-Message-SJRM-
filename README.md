@@ -1,3 +1,8 @@
+Here is your full `README.md` file with the **logo badge**, project information, and all other content formatted using Markdown:
+
+---
+
+```markdown
 <p align="center">
   <img src="https://img.shields.io/badge/Secure%20JSON--RPC%20Wrapper-%F0%9F%94%92-blue?style=for-the-badge&logo=python&logoColor=white" alt="Secure JSON-RPC Wrapper Badge"/>
 </p>
@@ -17,10 +22,6 @@
   <img src="https://img.shields.io/badge/License-MIT-green.svg?style=flat-square" alt="MIT License">
 </p>
 
-# Secure JSON-RPC Message Wrapper
-
-A lightweight and secure wrapper for JSON-RPC messages that ensures confidentiality, integrity, and authenticity of the communication between clients and servers. This project demonstrates how to wrap standard JSON-RPC 2.0 messages using modern cryptographic primitives to mitigate risks such as tampering, spoofing, and message interception.
-
 ---
 
 ## 📌 Table of Contents
@@ -34,7 +35,10 @@ A lightweight and secure wrapper for JSON-RPC messages that ensures confidential
 - [Message Structure](#message-structure)
 - [Security Considerations](#security-considerations)
 - [Project Structure](#project-structure)
+- [Testing](#testing)
 - [License](#license)
+- [Contributing](#contributing)
+- [Contact](#contact)
 
 ---
 
@@ -60,6 +64,30 @@ This wrapper adds **AES encryption**, **HMAC signing**, and **nonce-based replay
 
 ---
 
+## 🏗️ Architecture
+
+```
+
+Client
+|
+\|---> \[ JSON-RPC Message ]
+\|         ↓
+\|---> \[ Encrypt + Sign + Wrap ]
+\|         ↓
+\|---> \[ Secure JSON-RPC Envelope ]
+\|         ↓
+\|-------> Server
+
+Server
+|
+\|---> \[ Unwrap + Verify Signature + Decrypt ]
+\|         ↓
+\|---> \[ JSON-RPC Payload ]
+\|         ↓
+\|---> \[ Execute Procedure ]
+
+````
+
 ---
 
 ## 🔐 Cryptographic Standards
@@ -75,46 +103,63 @@ This wrapper adds **AES encryption**, **HMAC signing**, and **nonce-based replay
 ## ⚙️ Installation
 
 ### Prerequisites
+
 - Python 3.8+
 - `pip` installed
 
 ### Clone the Repository
+
 ```bash
 git clone https://github.com/shalak97/Secure-JSON-RPC-Message-Wrapper.git
 cd Secure-JSON-RPC-Message-Wrapper
+````
 
-🚀 Usage
-Step 1: Create JSON-RPC Payload
-python
-Copy
-Edit
+### Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+---
+
+## 🚀 Usage
+
+### Step 1: Create JSON-RPC Payload
+
+```python
 payload = {
     "jsonrpc": "2.0",
     "method": "getData",
     "params": {"key": "value"},
     "id": 1
 }
-Step 2: Encrypt and Wrap
-python
-Copy
-Edit
+```
+
+### Step 2: Encrypt and Wrap
+
+```python
 from crypto.wrapper import SecureJSONRPCWrapper
 
 wrapper = SecureJSONRPCWrapper(secret_key=b'securepassphrase123')
 secure_message = wrapper.encrypt_and_wrap(payload)
 print(secure_message)
-Step 3: Verify and Decrypt on Server
-python
-Copy
-Edit
+```
+
+### Step 3: Verify and Decrypt on Server
+
+```python
 received_message = secure_message  # received from client
 original_payload = wrapper.unwrap_and_decrypt(received_message)
 print(original_payload)
-🧾 Message Structure
-Secure Envelope Format:
-json
-Copy
-Edit
+```
+
+---
+
+## 🧾 Message Structure
+
+### Secure Envelope Format
+
+```json
 {
   "version": "1.0",
   "timestamp": "2025-08-01T12:00:00Z",
@@ -122,29 +167,28 @@ Edit
   "payload": "<base64_encrypted_json>",
   "hmac": "<base64_signature>"
 }
-version: Wrapper version
+```
 
-timestamp: ISO 8601 UTC time
+* **version**: Wrapper version
+* **timestamp**: ISO 8601 UTC time
+* **nonce**: Random string for replay protection
+* **payload**: AES-GCM encrypted JSON-RPC message (base64)
+* **hmac**: HMAC-SHA256 of the entire message (base64)
 
-nonce: Random string for replay protection
+---
 
-payload: AES-GCM encrypted JSON-RPC message (base64)
+## 🛡️ Security Considerations
 
-hmac: HMAC-SHA256 of the entire message (base64)
+* 🔑 **Key Management**: Store AES and HMAC keys securely. Avoid hardcoding in production.
+* ⏱️ **Replay Protection**: Validate timestamp and nonce. Consider caching used nonces.
+* ✅ **Verify Before Decrypting**: Always check HMAC before decrypting.
+* 🕒 **Message Expiry**: Reject messages older than a configured timestamp (e.g., 2 minutes).
 
-🛡️ Security Considerations
-Key Management: Keep your AES and HMAC keys secure. Avoid hardcoding them in production.
+---
 
-Replay Protection: Timestamp and nonce should be stored and validated on the server side.
+## 🗂️ Project Structure
 
-HMAC Verification: Always verify HMAC before decryption.
-
-Expiry Window: You can implement time-based expiry validation for messages (e.g., allow max 2-minute drift).
-
-🗂️ Project Structure
-pgsql
-Copy
-Edit
+```
 Secure-JSON-RPC-Message-Wrapper/
 ├── crypto/
 │   ├── __init__.py
@@ -155,16 +199,40 @@ Secure-JSON-RPC-Message-Wrapper/
 ├── requirements.txt
 ├── README.md
 └── LICENSE
-🧪 Testing
-bash
-Copy
-Edit
-pytest tests/
-📄 License
-This project is licensed under the MIT License. See the LICENSE file for details.
+```
 
-🙋‍♂️ Contributing
+---
+
+## 🧪 Testing
+
+```bash
+pytest tests/
+```
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License. See the [LICENSE](./LICENSE) file for details.
+
+---
+
+## 🙋‍♂️ Contributing
+
 Contributions are welcome! Feel free to fork the repository, open issues, and submit pull requests.
 
-## 🏗️ Architecture
+---
 
+## 📫 Contact
+
+For feedback or questions, feel free to reach out:
+
+* GitHub: [@shalak97](https://github.com/shalak97)
+
+
+---
+
+
+
+Let me know!
+```
