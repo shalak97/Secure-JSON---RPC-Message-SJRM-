@@ -1,8 +1,4 @@
-Here is your full `README.md` file with the **logo badge**, project information, and all other content formatted using Markdown:
 
----
-
-```markdown
 <p align="center">
   <img src="https://img.shields.io/badge/Secure%20JSON--RPC%20Wrapper-%F0%9F%94%92-blue?style=for-the-badge&logo=python&logoColor=white" alt="Secure JSON-RPC Wrapper Badge"/>
 </p>
@@ -22,7 +18,6 @@ Here is your full `README.md` file with the **logo badge**, project information,
   <img src="https://img.shields.io/badge/License-MIT-green.svg?style=flat-square" alt="MIT License">
 </p>
 
----
 
 ## 📌 Table of Contents
 
