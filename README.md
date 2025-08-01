@@ -223,11 +223,3 @@ Contributions are welcome! Feel free to fork the repository, open issues, and su
 For feedback or questions, feel free to reach out:
 
 * GitHub: [@shalak97](https://github.com/shalak97)
-
-
----
-
-
-
-Let me know!
-```
