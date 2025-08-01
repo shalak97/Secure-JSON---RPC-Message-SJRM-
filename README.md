@@ -1,3 +1,22 @@
+<p align="center">
+  <img src="https://img.shields.io/badge/Secure%20JSON--RPC%20Wrapper-%F0%9F%94%92-blue?style=for-the-badge&logo=python&logoColor=white" alt="Secure JSON-RPC Wrapper Badge"/>
+</p>
+
+<h1 align="center">Secure JSON-RPC Message Wrapper</h1>
+<p align="center">
+  <strong>🔐 Secure your JSON-RPC messages with AES-GCM and HMAC-SHA256</strong>
+</p>
+
+<p align="center">
+  <a href="https://github.com/shalak97/Secure-JSON-RPC-Message-Wrapper">
+    <img src="https://img.shields.io/github/stars/shalak97/Secure-JSON-RPC-Message-Wrapper?style=flat-square" alt="GitHub Stars">
+  </a>
+  <a href="https://github.com/shalak97/Secure-JSON-RPC-Message-Wrapper">
+    <img src="https://img.shields.io/github/last-commit/shalak97/Secure-JSON-RPC-Message-Wrapper?style=flat-square" alt="Last Commit">
+  </a>
+  <img src="https://img.shields.io/badge/License-MIT-green.svg?style=flat-square" alt="MIT License">
+</p>
+
 # Secure-JSON-RPC-Message wrapper
 SJRM can add per-message security features to JSON-RPC communications for Model Context Protocol.
 
